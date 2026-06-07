@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/root/uploads
+    environment:
+      # Conexión directa al contenedor de la base de datos
+      - DATABASE_URL=postgresql://neondb_owner:npg_QbRuv8kPV7ez@ep-blue-firefly-apfn9emf.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - JWT_SECRET=tu_secreto_seguro
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: hexagonal_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

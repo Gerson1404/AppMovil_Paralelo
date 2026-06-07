@@ -1,0 +1,52 @@
+# =========================
+# 1. Terraform (¡CRÍTICO PARA SEGURIDAD!)
+# =========================
+# Evita subir contraseñas y el estado local de la infraestructura
+terraform/terraform.tfvars
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+
+# =========================
+# 2. Binarios y Empaquetados para AWS Lambda
+# =========================
+# Evita subir los ejecutables que compila GitHub Actions o tu PC
+bootstrap
+deployment.zip
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# =========================
+# 3. Archivos de Go
+# =========================
+# Ignora las dependencias descargadas localmente (si usas go mod vendor)
+/vendor/
+go.work
+go.work.sum
+
+# =========================
+# 4. Entorno de Pruebas Local (App Móvil / Docker)
+# =========================
+# Evita subir las imágenes de prueba que enviaste desde el emulador
+uploads/
+
+# =========================
+# 5. Entornos y Variables
+# =========================
+.env
+.env.local
+
+# =========================
+# 6. IDEs y Sistema Operativo
+# =========================
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
