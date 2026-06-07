@@ -1,0 +1,64 @@
+name: Deploy Serverless API to AWS
+
+# Esto le indica al robot que se despierte cada vez que hagas un "git push" a la rama main
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-and-deploy:
+    name: Build Go & Run Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Descargar el código del repositorio
+        uses: actions/checkout@v3
+
+      - name: 2. Instalar Go en el servidor de GitHub
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21' # O la versión que uses en tu proyecto
+
+      - name: 3. Compilar código para Linux
+        # CGO_ENABLED=0 es vital para que el binario funcione en la nube sin dependencias (como hicimos en Docker)
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap ./cmd/main.go
+          
+      - name: 4. Empaquetar en archivo ZIP para AWS Lambda
+        run: zip deployment.zip bootstrap
+
+      - name: 5. Autenticarse en AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 6. Instalar Terraform en el servidor
+        uses: hashicorp/setup-terraform@v2
+
+      - name: 7. Terraform Init (Descargar plugins)
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: 8. Terraform Validate (Validar sintaxis)
+        working-directory: ./terraform
+        run: terraform validate
+
+      - name: 9. Terraform Plan (Visualizar cambios)
+        working-directory: ./terraform
+        env:
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+        run: terraform plan
+
+      - name: 10. Terraform Apply (Desplegar en AWS)
+        working-directory: ./terraform
+        env:
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+        run: terraform apply -auto-approve
