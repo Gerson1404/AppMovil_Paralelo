@@ -26,13 +26,11 @@ func NewUserService(repo ports.UserRepository, secret string) ports.UserService 
 }
 
 func (s *userService) Register(input domain.RegisterInput) (*domain.User, error) {
-	// Verificar si el email ya existe
 	existing, _ := s.repo.GetByEmail(input.Email)
 	if existing != nil {
 		return nil, domain.ErrEmailAlreadyExists
 	}
 
-	// Hashear la contraseña
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -58,16 +56,14 @@ func (s *userService) Login(input domain.LoginInput) (string, error) {
 		return "", domain.ErrInvalidCredentials
 	}
 
-	// Validar la contraseña
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
 	if err != nil {
 		return "", domain.ErrInvalidCredentials
 	}
 
-	// Generar Token JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(), // Expira en 24h
+		"exp": time.Now().Add(time.Hour * 24).Unix(), 
 	})
 
 	return token.SignedString(s.jwtSecret)
@@ -87,7 +83,6 @@ func (s *userService) UpdateUser(id int64, input domain.UpdateInput) (*domain.Us
 		user.Name = *input.Name
 	}
 	if input.Email != nil {
-		// Validar que el nuevo email no esté duplicado
 		if *input.Email != user.Email {
 			existing, _ := s.repo.GetByEmail(*input.Email)
 			if existing != nil {
@@ -112,33 +107,27 @@ func (s *userService) DeleteUser(id int64) error {
 	return s.repo.Delete(id)
 }
 
-// Implementación del nuevo método UploadFile
 func (s *userService) UploadFile(fileBytes []byte, filename string) (string, error) {
-	uploadDir := "uploads"
+	// MODIFICACIÓN 1: Usar la carpeta temporal permitida por AWS
+	uploadDir := "/tmp"
 
-	// 1. Asegurar que el directorio de uploads exista (Crea la carpeta si no está)
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		return "", fmt.Errorf("no se pudo crear el directorio de subida: %w", err)
 	}
 
-	// 2. Generar un nombre de archivo único agregando un timestamp
-	// Esto evita que si se suben dos archivos llamados "foto.png" se sobreescriban
 	ext := filepath.Ext(filename)
 	baseName := filename[:len(filename)-len(ext)]
 	uniqueFilename := fmt.Sprintf("%s_%d%s", baseName, time.Now().Unix(), ext)
 	
-	// 3. Crear la ruta final del archivo
 	filePath := filepath.Join(uploadDir, uniqueFilename)
 
-	// 4. Escribir los bytes en el archivo físico
 	if err := os.WriteFile(filePath, fileBytes, 0644); err != nil {
 		return "", fmt.Errorf("no se pudo guardar el archivo: %w", err)
 	}
 
-	// 5. Retornar la URL donde será accesible. 
-	// Nota: Si vas a consumirlo desde el emulador de Android (10.0.2.2), puedes ajustar esta URL 
-	// dinámicamente mediante variables de entorno si lo prefieres.
-	fileURL := fmt.Sprintf("http://localhost:8080/uploads/%s", uniqueFilename)
+	// MODIFICACIÓN 2: Usar la URL pública real para que Android la pueda renderizar
+	baseURL := "https://mvv94io5s5.execute-api.us-east-1.amazonaws.com"
+	fileURL := fmt.Sprintf("%s/uploads/%s", baseURL, uniqueFilename)
 	
 	return fileURL, nil
 }

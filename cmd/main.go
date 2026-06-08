@@ -18,7 +18,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// Variables globales para reutilización en AWS Lambda (Warm Starts)
 var ginLambda *ginadapter.GinLambda
 var db *sql.DB 
 
@@ -38,7 +37,6 @@ func initDB() {
 		log.Fatalf("Base de datos inaccesible: %v", err)
 	}
 
-	// Crear la tabla por si no existe
 	createTableQuery := `
 	CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
@@ -52,14 +50,11 @@ func initDB() {
 	}
 }
 
-// setupRouter aísla la configuración de la inyección de dependencias
 func setupRouter() *gin.Engine {
-	// 1. Inicializar la base de datos solo si no existe una conexión previa
 	if db == nil {
 		initDB()
 	}
 
-	// 2. Inyección de Dependencias (Hexágono)
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "super-secret-key-change-in-production"
@@ -69,19 +64,17 @@ func setupRouter() *gin.Engine {
 	userService := services.NewUserService(userRepo, jwtSecret)
 	userHandler := handlers.NewHTTPUserHandler(userService)
 
-	// 3. Inicialización del Servidor HTTP (Gin)
 	router := gin.Default()
 
-	router.Static("/uploads", "./uploads")
+	// MODIFICACIÓN 3: Decirle a Gin que exponga los archivos que están en /tmp
+	router.Static("/uploads", "/tmp")
 
-	// Rutas Públicas
 	api := router.Group("/api")
 	{
 		api.POST("/auth/register", userHandler.Register)
 		api.POST("/auth/login", userHandler.Login)
 	}
 
-	// Rutas Protegidas por JWT
 	protected := router.Group("/api")
 	protected.Use(middleware.JWTMiddleware(jwtSecret))
 	{
@@ -95,26 +88,21 @@ func setupRouter() *gin.Engine {
 	return router
 }
 
-// Handler es el puente traductor exclusivo para AWS API Gateway
 func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return ginLambda.ProxyWithContext(ctx, req)
 }
 
 func main() {
-	// Preparamos todo el ecosistema (DB, Repos, Casos de uso, Rutas)
 	router := setupRouter()
 
-	// Envolvemos Gin en el adaptador Serverless
 	ginLambda = ginadapter.New(router)
 
-	// Patrón Híbrido: Detección automática del entorno de ejecución
 	if os.Getenv("LAMBDA_TASK_ROOT") != "" {
 		log.Println("Ejecutando en modo Serverless (AWS Lambda)...")
 		lambda.Start(Handler)
 	} else {
 		log.Println("Ejecutando en modo Local (Docker/HTTP puerto 8080)...")
 		
-		// En local cerramos la base de datos al detener el servidor de forma segura
 		defer db.Close() 
 		
 		if err := router.Run(":8080"); err != nil {
