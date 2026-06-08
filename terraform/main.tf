@@ -54,7 +54,7 @@ resource "aws_apigatewayv2_integration" "lambda_integration" {
   integration_type = "AWS_PROXY"
 
   integration_uri        = aws_lambda_function.api_lambda.invoke_arn
-  payload_format_version = "2.0"
+  payload_format_version = "1.0"
 }
 
 # 5. Ruta que atrapa todo el tráfico (Cualquier endpoint /api/...) y lo manda a Gin
